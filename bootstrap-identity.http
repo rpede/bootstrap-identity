@@ -1,0 +1,6 @@
+@bootstrap_identity_HostAddress = http://localhost:5096
+
+GET {{bootstrap_identity_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
