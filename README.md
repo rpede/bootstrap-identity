@@ -18,10 +18,6 @@ dotnet add package Microsoft.EntityFrameworkCore.Design --version 8.0.10
 dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL --version 8.0.10
 ```
 
-```sh
-dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore --version 8.0.10
-```
-
 `appsettings.Development.json`
 
 ```json
