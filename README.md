@@ -1,58 +1,21 @@
 # Bootstrap Identity
 
-## How to run
+Create a new web api project using controllers
 
 ```sh
-docker compose -d
-dotnet run
+dotnet new webapi -controllers
 ```
 
-## Initial project setup
-
-This section shows how the project was created.
+Optionally create a different project for data access.
+Then add these dependencies:
 
 ```sh
-dotnet new gitignore
-dotnet new webapi --use-controllers --use-program-main
-dotnet add package Microsoft.EntityFrameworkCore.Design --version 8.0.10
-dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL --version 8.0.10
+dotnet add package Microsoft.EntityFrameworkCore.Design --version 9.0
+dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore --version 9.0
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
 ```
 
-```sh
-dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore --version 8.0.10
-```
-
-`appsettings.Development.json`
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "ConnectionStrings": {
-    "AppDb": "HOST=localhost;DB=postgres;UID=postgres;PWD=mysecret;PORT=5432;"
-  }
-}
-```
-
-`docker-compose.yml`
-
-```yml
-services:
-  db:
-    image: postgres:16-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mysecret
-    ports:
-      - "5432:5432"
-```
-
-`AppDbContext.cs`
+Create a DbContext, like this:
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +29,7 @@ public class AppDbContext : DbContext
 }
 ```
 
-`Program.cs`
+In `Program.cs`, add the following before `builder.Build()`:
 
 ```cs
 var connectionString = builder.Configuration.GetConnectionString("AppDb");
@@ -76,58 +39,63 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
 );
 
-// ...
+builder.Services.AddAuthorization();
+builder.Services.AddIdentityApiEndpoints<IdentityUser>()
+    .AddEntityFrameworkStores<AppDbContext>();
+```
 
+And this after `builder.Build()`:
+
+```cs
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    context.Database.EnsureCreated();
 }
+
+app.MapIdentityApi<IdentityUser>();
 ```
 
-## How to add Identity
-
-This section shows you how add Identity to the project.
+For Scalar, add dependency:
 
 ```sh
-dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore --version 8.0.10
+dotnet add package Scalar.AspNetCore
 ```
 
-Change `AppDbContext.cs` to:
+Then on the line right below `app.MapOpenApi()` add:
 
 ```cs
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
-
-namespace bootstrap_identity;
-
-public class AppDbContext : IdentityDbContext<IdentityUser>
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options) { }
-}
+app.MapScalarApiReference();
 ```
 
-`Program.cs`
+We need a database to try it out.
+Add to `appsettings.Development`:
 
-```cs
-builder.Services.AddAuthentication();
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        // Globally require users to be authenticated
-        .RequireAuthenticatedUser()
-        .Build();
-});
-builder
-    .Services.AddIdentityApiEndpoints<IdentityUser>()
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<AppDbContext>();
-
-//...
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapIdentityApi<IdentityUser>().AllowAnonymous();
+```json
+  "ConnectionStrings": {
+    "AppDb": "HOST=localhost;DB=postgres;UID=postgres;PWD=mysecret;PORT=5432;"
+  }
 ```
+
+And this to `docker-compose.yml`:
+
+```yml
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecret
+    ports:
+      - "5432:5432"
+```
+
+To run do:
+
+```sh
+docker compose up -d
+dotnet run
+```
+
+Now go to `/scalar` to try it out.
